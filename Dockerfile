@@ -7,7 +7,7 @@ WORKDIR /usr/src/app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 # Copy package manifests first to leverage layer caching
-COPY package.json package-lock.json* ./
+COPY app/package.json app/package-lock.json* ./
 
 # Install dependencies
 RUN npm ci --only=production
