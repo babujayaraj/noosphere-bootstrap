@@ -19,10 +19,10 @@ provider "aws" {
   secret_key                  = var.aws_secret_key
   skip_credentials_validation = true
   skip_requesting_account_id  = true
-  s3_force_path_style         = true
+  s3_use_path_style           = true
 
   # When running against LocalStack, set var.localstack_endpoint to e.g. "http://localhost:4566"
-  endpoints  {
+  endpoints {
     s3    = var.localstack_endpoint
     ssm   = var.localstack_endpoint
     ecs   = var.localstack_endpoint
