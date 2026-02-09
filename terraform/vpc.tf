@@ -7,7 +7,20 @@ resource "aws_vpc" "main" {
   }
 }
 
-# resource "aws_subnet" "public" 
+# resource "aws_subnet" "public" 2 subnets for extendability
+locals {
+  public_subnets = {
+    public_a = {
+      cidr_block = "10.0.1.0/24"
+      az         = "${var.region}a"
+    }
+    public_b = {
+      cidr_block = "10.0.2.0/24"
+      az         = "${var.region}b"
+    }
+  }
+}
+
 resource "aws_subnet" "public" {
   for_each = local.public_subnets
 
