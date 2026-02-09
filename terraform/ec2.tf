@@ -1,5 +1,9 @@
 # EC2 Instances
 # LocalStack does not provide real AMI catalog lookups (DescribeImages),
+locals {
+  public_subnet_ids = [for s in aws_subnet.public : s.id]
+}
+
 resource "aws_instance" "ec2" {
   for_each = var.instances
 
