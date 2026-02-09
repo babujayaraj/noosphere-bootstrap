@@ -42,4 +42,4 @@ jobs:
 
       - name: Grype scan (fail on High/Critical)
         run: |
-          grype ${{ env.IMAGE_NAME }}:scan --fail-on high --severity high,critical
+          grype repo/my-api:ci --fail-on high
