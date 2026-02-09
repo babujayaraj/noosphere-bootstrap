@@ -7,8 +7,8 @@ on:
     branches: [main, feat/test]
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: repo/my-api
+
 
 jobs:
   build:
@@ -23,21 +23,23 @@ jobs:
 
       - name: Build Docker image (local)
         run: |
-          docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
+          docker build -t repo/my-api:ci .
 
   security-scan:
     runs-on: ubuntu-latest
     needs: build
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Build image for scanning
         run: |
           docker build -t ${{ env.IMAGE_NAME }}:scan .
 
-      - name: Placeholder - Security scan
+      - name: Install Grype
         run: |
-          echo "TODO: Replace this step with Grype scanning"
-          echo "The scan should fail the build on HIGH or CRITICAL vulnerabilities"
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Grype scan (fail on High/Critical)
+        run: |
+          grype ${{ env.IMAGE_NAME }}:scan --fail-on high --severity high,critical
