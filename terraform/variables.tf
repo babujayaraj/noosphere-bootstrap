@@ -47,3 +47,8 @@ variable "instances" {
   }))
   default = {}
 }
+
+variable "ami_id" {
+  type        = string
+  description = "Static AMI ID (LocalStack-safe)."
+}
