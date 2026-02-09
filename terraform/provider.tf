@@ -22,7 +22,7 @@ provider "aws" {
   s3_force_path_style         = true
 
   # When running against LocalStack, set var.localstack_endpoint to e.g. "http://localhost:4566"
-  endpoints = {
+  endpoints  {
     s3    = var.localstack_endpoint
     ssm   = var.localstack_endpoint
     ecs   = var.localstack_endpoint
