@@ -13,7 +13,7 @@ COPY app/package.json app/package-lock.json* ./
 RUN npm ci --only=production
 
 # Copy app source
-COPY src ./src
+COPY app/src ./src
 
 # Ensure logs written to stdout
 ENV NODE_ENV=production
