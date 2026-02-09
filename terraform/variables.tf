@@ -40,12 +40,12 @@ variable "db_username" {
 }
 
 variable "instances" {
-  description = "Map of EC2 instance configurations"
   type = map(object({
-    instance_type = string
-    name          = string
+    instance_type       = string
+    subnet_index        = number
+    associate_public_ip = optional(bool)
+    tags                = optional(map(string))
   }))
-  default = {}
 }
 
 variable "ami_id" {
