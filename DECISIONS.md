@@ -1,197 +1,132 @@
 # Architecture & Implementation Decisions
 
-This document explains the key technical decisions made while completing the DevOps / Platform Engineer technical assessment.  
-The focus was on correctness, security by default, least-privilege access, and pragmatic trade-offs aligned with real-world platform engineering.
+This document captures the key technical decisions made during the implementation of the **noosphere-bootstrap** project, along with the rationale behind them and known trade-offs.
 
 ---
 
-## 1. Overall Approach
+## 1. Infrastructure (Terraform)
 
-The repository was treated as a real inherited codebase rather than a greenfield project.  
-Work was done incrementally using **atomic commits** and conventional commit messages to reflect how changes would be delivered in a production environment.
+### Decision
+Infrastructure is implemented using **Terraform**, designed to run against **LocalStack** by default.
 
-The implementation order broadly followed the README guidance:
-1. Infrastructure (Terraform)
-2. Container build & hardening
-3. CI/CD pipeline
-4. Kubernetes deployment
-5. Security & permissions
-6. Documentation and validation
+### Rationale
+- Avoids the need for a real AWS account during assessment.
+- Enables deterministic, repeatable testing.
+- Matches real-world Terraform workflows while remaining cost-free.
 
----
-
-## 2. Infrastructure (Terraform)
-
-### VPC and Subnets
-A VPC with public subnets was created to support EC2 workloads.  
-Subnets were defined explicitly rather than hard-coding values to ensure the design is:
-- Repeatable
-- Extendable to additional environments
-- Easy to reason about in Terraform plans
-
-### EC2 Instances
-Three EC2 instances were created using a **map-based configuration (`var.instances`) and `for_each`**.  
-This allows:
-- Different instance types per workload
-- Easy extension without duplicating resource blocks
-- Clear separation of configuration and infrastructure logic
-
-This pattern reflects production Terraform practices.
-
-### S3 Bucket with Lifecycle Policy
-An S3 bucket was added with a lifecycle rule to automatically delete objects after **7 days**.
-
-Rationale:
-- Prevents uncontrolled storage growth
-- Matches common patterns for logs, artifacts, or temporary data
-- Demonstrates awareness of cost and operational hygiene
-
-### LocalStack Usage
-LocalStack was used instead of a real AWS account, as explicitly allowed by the README.
-
-This ensured:
-- No real cloud resources were created
-- No credentials were required
-- Terraform plans and resource definitions could still be validated
+### Implemented Components
+- VPC with public subnets
+- Three EC2 instances created using repeatable, extensible code
+- S3 bucket with lifecycle policy to auto-delete objects after 7 days
+- SSM parameter usage for secrets (no plaintext secrets committed)
 
 ---
 
-## 3. Container Build & Application Hardening
+## 2. CI/CD Pipeline
 
-### Multi-Stage Docker Build
-A multi-stage Dockerfile was used to:
-- Install dependencies in a dedicated build stage
-- Copy only production dependencies and application source into the runtime image
-
-This reduces:
-- Image size
-- Attack surface
-- Accidental inclusion of build tools
-
-### Non-Root Execution
-The application runs as a **non-root user with a fixed numeric UID (10001)**.
-
-Rationale:
-- Required for Kubernetes `runAsNonRoot` enforcement
-- Avoids ambiguity caused by named users
-- Aligns with container security best practices
-
-### Minimal Runtime Contents
-Only the following are present in the final image:
-- Node.js runtime
-- Production dependencies
-- Application source code
-
-No dev dependencies or tooling are included.
-
----
-
-## 4. CI/CD Pipeline
-
-### GitHub Actions
-GitHub Actions was used as required by the assessment.
-
-The pipeline includes:
-- Source checkout
+### Decision
+GitHub Actions is used to implement a CI pipeline that includes:
 - Docker image build
-- Container security scanning with Grype
+- Container security scanning with **Grype**
+- Terraform validation and planning
+- Semantic versioning and release tagging
 
-### Grype Security Scanning
-Grype was added to scan the built container image and fail the pipeline on **High or Critical vulnerabilities**.
-
-Trade-off:
-- Base image and transitive npm dependencies can introduce vulnerabilities outside direct application control.
-- For this assessment, the scan is intentionally strict to demonstrate security awareness.
-- In a real production environment, this would typically be paired with allowlists or risk-based policies.
+### Rationale
+- GitHub Actions is a widely adopted, production-grade CI platform.
+- Pipeline structure mirrors real-world DevOps workflows.
+- Emphasis placed on security and automation.
 
 ---
 
-## 5. Kubernetes Deployment
+## 3. Container Security Scanning (Grype)
 
-### Manifests
-The Kubernetes manifests were corrected and validated to ensure:
-- Proper API versions (`apps/v1`, `v1`)
-- Correct namespace usage
-- Matching labels and selectors
+### Decision
+The Grype security scan is configured to **fail the pipeline on HIGH and CRITICAL vulnerabilities**, even if those vulnerabilities originate from indirect or ecosystem-level dependencies.
 
-### Security Context
-The Deployment enforces:
-- `runAsNonRoot: true`
-- Explicit `runAsUser`
+### Rationale
+- This reflects a **strict security posture**, often required in regulated or security-first environments.
+- The goal is to demonstrate visibility and awareness of container security risks, not to artificially force a green build.
+- Several reported vulnerabilities originate from:
+  - Transitive npm dependencies
+  - Base image tooling (Alpine / Node)
+- These are common and expected findings in real projects.
+
+### Trade-off
+- The pipeline is intentionally **red** due to known HIGH vulnerabilities.
+- In a production system, typical mitigations would include:
+  - Allowlisting known low-risk findings
+  - Failing only on CRITICAL issues
+  - Using policy files or risk acceptance workflows
+- For this assessment, transparency is preferred over suppression.
+
+---
+
+## 4. Application Hardening (Docker)
+
+### Decision
+The application container is hardened to:
+- Run as a **non-root user**
+- Include only production dependencies
+- Use a multi-stage Docker build
+
+### Rationale
+- Reduces attack surface.
+- Aligns with Kubernetes security best practices.
+- Ensures compatibility with `runAsNonRoot` enforcement.
+
+---
+
+## 5. Kubernetes Manifests
+
+### Decision
+Kubernetes manifests are provided for:
+- Namespace
+- Deployment
+- Service
+
+### Key Features
+- `securityContext` enforcing non-root execution
 - Resource requests and limits
+- Readiness and liveness probes on `/health`
+- Image tag alignment with Docker build output
 
-This ensures:
-- Pod hardening
-- Predictable scheduling
-- Compliance with cluster security policies
-
-### Health Probes
-Readiness and liveness probes were configured against `/health`.
-
-This enables:
-- Zero-downtime rollouts
-- Automatic recovery from application failures
-
-### Validation
-The application was successfully validated using:
-- `kubectl apply`
-- `kubectl port-forward`
-- `curl /health` and `/api/data`
+### Rationale
+- Demonstrates production-ready Kubernetes patterns.
+- Allows easy local testing via `kubectl port-forward`.
 
 ---
 
-## 6. Security & Secrets Management
+## 6. Security & IAM
 
-### No Plaintext Secrets
-No secrets are committed to the repository:
-- No AWS credentials in Terraform variables
-- No secrets in CI workflows
-- No secrets baked into container images
+### Decision
+GitHub Actions authentication is implemented using **OIDC with IAM roles**, following least-privilege principles.
 
-### IAM Role for GitHub Actions
-A GitHub Actions IAM role was defined using **OIDC (OpenID Connect)**.
+### Rationale
+- No long-lived AWS credentials stored in GitHub secrets.
+- IAM permissions scoped to only required services.
+- Matches modern AWS security best practices.
 
-Key characteristics:
-- No long-lived credentials
-- Trust restricted to a specific repository and branch
-- Policy scoped to required services only
-
-This demonstrates a modern, secure CI authentication model.
-
-### AWS Account Limitation
-A real AWS account was not used.  
-The IAM role and policies were implemented declaratively in Terraform to demonstrate design intent and least-privilege thinking, even though role assumption was not executed.
+### Note
+A real AWS account is not required to validate this setup for the assessment. The Terraform configuration documents the intended production design.
 
 ---
 
-## 7. Git Practices
+## 7. Git & Release Management
 
-- Conventional commit messages were used (`feat`, `fix`, `docs`, `security`)
-- Changes were made in small, focused commits
-- The repository history reflects incremental troubleshooting and improvement
+### Decision
+- Conventional Commits are used throughout.
+- Semantic versioning is implemented via GitHub Actions.
 
-### Semantic Versioning
-Semantic versioning support was added to the CI workflow to enable automated tagging on successful releases.
-
----
-
-## 8. Trade-offs and Limitations
-
-- Grype scanning may fail due to upstream dependencies; this is intentional for demonstration.
-- LocalStack was used instead of AWS; real deployments would require additional validation.
-- Kubernetes was tested locally via Docker Desktop rather than a managed cloud cluster.
-
-These trade-offs were chosen to balance realism with the constraints of a take-home assessment.
+### Rationale
+- Enables automated changelogs and releases.
+- Improves clarity of intent in commit history.
+- Demonstrates production-grade Git hygiene.
 
 ---
 
-## 9. Summary
+## Final Notes
 
-The final solution delivers:
-- Secure, repeatable infrastructure
-- Hardened containerized application
-- Working CI pipeline with security scanning
-- Deployable Kubernetes manifests
-- Clear documentation and reasoning
+- The repository prioritizes **clarity, security, and realism** over artificially passing checks.
+- Known issues (such as HIGH vulnerability findings) are intentionally surfaced and documented.
+- This approach mirrors real DevOps work, where trade-offs are explicit and well-reasoned rather than hidden.
 
-The approach emphasizes **platform thinking, security by default, and pragmatic DevOps practices**, aligning with the expectations of a mid-level Platform / DevOps Engineer role.
