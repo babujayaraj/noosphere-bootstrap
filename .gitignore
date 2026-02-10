@@ -7,3 +7,18 @@ node_modules/
 .terraform*
 
 .DS_STORE
+
+# env files
+.env
+.env.*
+
+# keys/certs
+*.pem
+*.key
+*.p12
+
+# terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform.lock.hcl
