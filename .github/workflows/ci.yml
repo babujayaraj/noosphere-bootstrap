@@ -47,7 +47,6 @@ jobs:
           grype repo/my-api:ci --fail-on high
 
   terraform:
-    if: ${{ env.AWS_ROLE_ARN != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,12 +54,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -79,9 +72,27 @@ jobs:
         working-directory: terraform
         run: terraform validate
 
+      # Only configure AWS if AWS_ROLE_ARN exists
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ secrets.AWS_ROLE_ARN != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Only run plan if AWS credentials were configured
       - name: Terraform plan (dev)
+        if: ${{ secrets.AWS_ROLE_ARN != '' }}
         working-directory: terraform
         run: terraform plan -var-file=envs/dev.tfvars
+
+      # If no AWS role ARN, explicitly skip with a clear log (so reviewers understand)
+      - name: Skip Terraform plan (no AWS_ROLE_ARN configured)
+        if: ${{ secrets.AWS_ROLE_ARN == '' }}
+        run: |
+          echo "Skipping terraform plan because AWS_ROLE_ARN secret is not configured."
+          echo "This repo supports running terraform against LocalStack locally as per README."
+
 
 
   release:
