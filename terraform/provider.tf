@@ -12,11 +12,10 @@ terraform {
   }
 }
 
-# AWS provider configured to be compatible with LocalStack by default.
+# AWS provider compatible with LocalStack by default.
+# Credentials should come from environment variables or OIDC (GitHub Actions), not from Terraform variables.
 provider "aws" {
   region                      = var.region
-  access_key                  = var.aws_access_key
-  secret_key                  = var.aws_secret_key
   skip_credentials_validation = true
   skip_requesting_account_id  = true
   s3_use_path_style           = true
