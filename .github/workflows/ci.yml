@@ -46,23 +46,22 @@ jobs:
           grype repo/my-api:ci --fail-on high
 
   terraform:
+    # Only run if a real AWS Role ARN is configured in repo secrets
+    if: ${{ secrets.AWS_ROLE_ARN != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write   # required for OIDC to AWS
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
 
-      # --- OPTION A (Real AWS): OIDC role assumption ---
-      # Create the IAM role separately (Terraform or manually), then paste role ARN below.
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::<ACCOUNT_ID>:role/<ROLE_NAME>
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # --- Terraform checks ---
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -83,3 +82,28 @@ jobs:
       - name: Terraform plan (dev)
         working-directory: terraform
         run: terraform plan -var-file=envs/dev.tfvars
+
+  release:
+    runs-on: ubuntu-latest
+    # Do not depend on terraform because it may be skipped without AWS_ROLE_ARN
+    needs: [build, security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Semantic Release (tag + release)
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          semantic_version: 23
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
