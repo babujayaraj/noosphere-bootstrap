@@ -3,11 +3,14 @@ kind: Service
 metadata:
   name: api-service
   namespace: devops-tech-test
+  labels:
+    app: devops-tech-test-api
 spec:
   selector:
     app: devops-tech-test-api
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 80
       targetPort: 3000
   type: ClusterIP
