@@ -16,15 +16,21 @@ spec:
         app: devops-tech-test-api
     spec:
       securityContext:
-        runAsUser: 1000
+        runAsNonRoot: true
         fsGroup: 1000
       containers:
         - name: api
           image: repo/my-api:latest
           imagePullPolicy: IfNotPresent
+
           ports:
             - containerPort: 3000
               name: http
+
+          env:
+            - name: NODE_ENV
+              value: "production"
+
           readinessProbe:
             httpGet:
               path: /health
@@ -32,7 +38,7 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 5
             failureThreshold: 3
-            successThreshold: 1
+
           livenessProbe:
             httpGet:
               path: /health
@@ -40,6 +46,7 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 10
             failureThreshold: 3
+
           resources:
             requests:
               cpu: "100m"
@@ -47,6 +54,8 @@ spec:
             limits:
               cpu: "250m"
               memory: "256Mi"
-          env:
-            - name: NODE_ENV
-              value: "production"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
