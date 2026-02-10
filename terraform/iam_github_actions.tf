@@ -1,23 +1,3 @@
-variable "github_org" {
-  type        = string
-  description = "GitHub org/user that owns the repo (e.g., babuj)"
-}
-
-variable "github_repo" {
-  type        = string
-  description = "GitHub repo name (e.g., noosphere-bootstrap)"
-}
-
-data "aws_caller_identity" "current" {}
-
-resource "aws_iam_openid_connect_provider" "github" {
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
-
-  # Common GitHub Actions OIDC thumbprint
-  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
-}
-
 data "aws_iam_policy_document" "github_oidc_trust" {
   statement {
     effect  = "Allow"
@@ -45,13 +25,21 @@ data "aws_iam_policy_document" "github_oidc_trust" {
   }
 }
 
+resource "aws_iam_openid_connect_provider" "github" {
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+
+  # Common GitHub Actions OIDC thumbprint
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+}
+
 resource "aws_iam_role" "github_actions" {
   name               = "${var.project}-${var.environment}-gha"
   assume_role_policy = data.aws_iam_policy_document.github_oidc_trust.json
 }
 
-# Minimal policy for Terraform to manage THIS project's resources.
-# Tighten further with tags if desired.
+# Minimal permissions for this assessment stack (broad but reasonable baseline).
+# You can tighten further using tag conditions later (nice bonus).
 data "aws_iam_policy_document" "github_actions_permissions" {
   statement {
     effect = "Allow"
@@ -100,8 +88,8 @@ data "aws_iam_policy_document" "github_actions_permissions" {
   }
 
   statement {
-    effect = "Allow"
-    actions = ["sts:GetCallerIdentity"]
+    effect    = "Allow"
+    actions   = ["sts:GetCallerIdentity"]
     resources = ["*"]
   }
 }

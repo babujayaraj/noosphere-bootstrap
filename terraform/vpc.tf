@@ -34,5 +34,5 @@ resource "aws_subnet" "public" {
     Tier = "public"
   }
 }
- 
+
 

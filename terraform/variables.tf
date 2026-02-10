@@ -42,3 +42,15 @@ variable "ami_id" {
   type        = string
   description = "Static AMI ID (LocalStack-safe)."
 }
+
+variable "github_org" {
+  type        = string
+  description = "GitHub org/user that owns the repo"
+  default     = "babujayaraj"
+}
+
+variable "github_repo" {
+  type        = string
+  description = "GitHub repo name"
+  default     = "noosphere-bootstrap"
+}
